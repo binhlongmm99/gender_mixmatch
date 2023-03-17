@@ -41,6 +41,8 @@ parser.add_argument('--manualSeed', type=int, default=0, help='manual seed')
 parser.add_argument('--gpu', default='0', type=str,
                     help='id(s) for CUDA_VISIBLE_DEVICES')
 #Method options
+parser.add_argument('--n_class', type=int, default=2,
+                        help='Number of class')
 parser.add_argument('--n-labeled', type=int, default=250,
                         help='Number of labeled data')
 parser.add_argument('--train-iteration', type=int, default=25,
@@ -90,7 +92,7 @@ def main():
     ])
 
     train_labeled_set, train_unlabeled_set, \
-        val_set, test_set = dataset.get_gender_data(INPUT_DIR_PATH, DOMAIN, args.n_labeled, 
+        val_set, test_set = dataset.get_gender_data(INPUT_DIR_PATH, DOMAIN, args.n_labeled, args.n_class,
                                                 transform_train=transform_train, 
                                                 transform_val=transform_val)
     labeled_trainloader = data.DataLoader(train_labeled_set, batch_size=args.batch_size, 
@@ -107,7 +109,7 @@ def main():
     print("==> creating WRN-28-2")
 
     def create_model(ema=False):
-        model = models.WideResNet(num_classes=2)
+        model = models.WideResNet(num_classes=args.n_class)
         model = model.cuda()
         if ema:
             for param in model.parameters():

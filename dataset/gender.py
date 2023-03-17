@@ -11,6 +11,7 @@ from preprocess import transpose, normalize, TransformTwice
 INPUT_DIR_PATH = r"E:\icomm\data"
 DOMAIN = "domain_hawkice_damdev"
 
+
 def get_gender_data(root, domain, n_labeled, n_class,
                  transform_train=None, transform_val=None,
                  download=True):
