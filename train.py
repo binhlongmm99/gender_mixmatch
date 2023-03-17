@@ -18,7 +18,7 @@ import torchvision.transforms as transforms
 import torch.nn.functional as F
 
 import models.wideresnet as models
-import dataset.cifar10 as dataset
+import dataset.gender as dataset
 from utils import Bar, Logger, AverageMeter, accuracy, mkdir_p, savefig
 from tensorboardX import SummaryWriter
 
