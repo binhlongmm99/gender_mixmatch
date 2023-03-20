@@ -24,7 +24,7 @@ from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(description='PyTorch MixMatch Training')
 # Optimization options
-parser.add_argument('--epochs', default=10, type=int, metavar='N',
+parser.add_argument('--epochs', default=2, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
@@ -68,7 +68,7 @@ if args.manualSeed is None:
 np.random.seed(args.manualSeed)
 
 best_acc = 0  # best test accuracy
-INPUT_DIR_PATH = r"E:\icomm\data"
+INPUT_DIR_PATH = r"./data"
 # INPUT_DIR_PATH = r"E:\icomm\data\domain_hawkice_damdev"
 DOMAIN = "domain_hawkice_damdev"
 
@@ -76,6 +76,7 @@ DOMAIN = "domain_hawkice_damdev"
 def main():
     global best_acc
 
+    args.out =  os.path.join('result', args.out)
     if not os.path.isdir(args.out):
         mkdir_p(args.out)
 
@@ -91,16 +92,31 @@ def main():
         transforms.ToTensor(),
     ])
 
-    train_labeled_set, train_unlabeled_set, \
-        val_set, test_set = dataset.get_gender_data(INPUT_DIR_PATH, DOMAIN, args.n_labeled, args.n_class,
-                                                transform_train=transform_train, 
-                                                transform_val=transform_val)
-    labeled_trainloader = data.DataLoader(train_labeled_set, batch_size=args.batch_size, 
-                                          shuffle=True, num_workers=0, drop_last=True)
+    train_set, train_sampler, valid_sampler, \
+            train_unlabeled_set, test_set = dataset.get_gender_data(INPUT_DIR_PATH, DOMAIN, 
+                                                        args.n_labeled, args.n_class,
+                                                        transform_train=transform_train, 
+                                                        transform_val=transform_val)
+
+    labeled_trainloader = data.DataLoader(train_set, batch_size=args.batch_size, 
+                                            sampler=train_sampler,
+                                            shuffle=False, num_workers=0, drop_last=True)
+    
+    val_loader = data.DataLoader(train_set, batch_size=args.batch_size, 
+                                    sampler=valid_sampler,
+                                    shuffle=False, num_workers=0)
+
+    # train_labeled_set, train_unlabeled_set, \
+    #     val_set, test_set = dataset.get_gender_data(INPUT_DIR_PATH, DOMAIN, args.n_labeled, args.n_class,
+    #                                             transform_train=transform_train, 
+    #                                             transform_val=transform_val)
+    # labeled_trainloader = data.DataLoader(train_labeled_set, batch_size=args.batch_size, 
+    #                                       shuffle=True, num_workers=0, drop_last=True)
+    # val_loader = data.DataLoader(val_set, batch_size=args.batch_size, 
+    #                              shuffle=False, num_workers=0)
+
     unlabeled_trainloader = data.DataLoader(train_unlabeled_set, batch_size=args.batch_size, 
                                             shuffle=True, num_workers=0, drop_last=True)
-    val_loader = data.DataLoader(val_set, batch_size=args.batch_size, 
-                                 shuffle=False, num_workers=0)
     test_loader = data.DataLoader(test_set, batch_size=args.batch_size, 
                                   shuffle=False, num_workers=0)
 
@@ -110,7 +126,8 @@ def main():
 
     def create_model(ema=False):
         model = models.WideResNet(num_classes=args.n_class)
-        model = model.cuda()
+        if use_cuda:
+            model = model.cuda()
         if ema:
             for param in model.parameters():
                 param.detach_()
@@ -150,6 +167,7 @@ def main():
 
     writer = SummaryWriter(args.out)
     step = 0
+    n_class = args.n_class
     test_accs = []
     # Train and val
     for epoch in range(start_epoch, args.epochs):
@@ -158,7 +176,7 @@ def main():
 
         train_loss, train_loss_x, train_loss_u = train(labeled_trainloader, unlabeled_trainloader, 
                                                        model, optimizer, ema_optimizer, 
-                                                       train_criterion, epoch, use_cuda)
+                                                       train_criterion, epoch, n_class, use_cuda)
         _, train_acc = validate(labeled_trainloader, ema_model, criterion, 
                                 epoch, use_cuda, mode='Train Stats')
         val_loss, val_acc = validate(val_loader, ema_model, criterion, 
@@ -202,7 +220,8 @@ def main():
 
 
 def train(labeled_trainloader, unlabeled_trainloader, 
-          model, optimizer, ema_optimizer, criterion, epoch, use_cuda):
+          model, optimizer, ema_optimizer, criterion, 
+          epoch, n_class, use_cuda):
 
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -230,13 +249,22 @@ def train(labeled_trainloader, unlabeled_trainloader,
             unlabeled_train_iter = iter(unlabeled_trainloader)
             (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
 
+        # print("Check size")
+        # print(inputs_x.size())
+        # print(targets_x.size())
+        # print(inputs_u.size())
+        # print(inputs_u2.size())
+        # print(_.size())
+        # print()
+
         # measure data loading time
         data_time.update(time.time() - end)
 
         batch_size = inputs_x.size(0)
 
         # Transform label to one-hot
-        targets_x = torch.zeros(batch_size, 10).scatter_(1, targets_x.view(-1,1).long(), 1)
+        targets_x = torch.zeros(batch_size, n_class).scatter_(1, targets_x.view(-1,1).long(), 1)
+        # print(targets_x.size())
 
         if use_cuda:
             inputs_x, targets_x = inputs_x.cuda(), targets_x.cuda(non_blocking=True)

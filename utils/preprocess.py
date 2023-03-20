@@ -2,8 +2,8 @@ import numpy as np
 import torch
 
 
-_mean = 0.3475, 0.3240, 0.3475
-_std = 0.1934, 0.1898, 0.1914
+_mean = (0.3475, 0.3240, 0.3475)
+_std = (0.1934, 0.1898, 0.1914)
 
 # def get_mean_std(data_set): 
 #     mean = np.mean(data_set.train_data, axis=(0,1,2))/255
