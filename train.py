@@ -43,9 +43,9 @@ parser.add_argument('--gpu', default='0', type=str,
 #Method options
 parser.add_argument('--n_class', type=int, default=2,
                         help='Number of class')
-parser.add_argument('--n-labeled', type=int, default=250,
+parser.add_argument('--n-labeled', type=int, default=0,
                         help='Number of labeled data')
-parser.add_argument('--train-iteration', type=int, default=25,
+parser.add_argument('--train-iteration', type=int, default=5,
                         help='Number of iteration per epoch')
 parser.add_argument('--out', default='result',
                         help='Directory to output the result')
@@ -89,6 +89,7 @@ def main():
     ])
 
     transform_val = transforms.Compose([
+        transforms.Resize(size = (32,32)),
         transforms.ToTensor(),
     ])
 
@@ -207,7 +208,7 @@ def main():
                 'acc': val_acc,
                 'best_acc': best_acc,
                 'optimizer' : optimizer.state_dict(),
-            }, is_best)
+            }, is_best, args.out)
         test_accs.append(test_acc)
     logger.close()
     writer.close()
@@ -356,7 +357,7 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
     data_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
-    top5 = AverageMeter()
+    topk = AverageMeter()
 
     # switch to evaluate mode
     model.eval()
@@ -375,17 +376,18 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
             loss = criterion(outputs, targets)
 
             # measure accuracy and record loss
-            prec1, prec5 = accuracy(outputs, targets, topk=(1, 5))
+            prec1, preck = accuracy(outputs, targets, topk=(1, 2))
             losses.update(loss.item(), inputs.size(0))
             top1.update(prec1.item(), inputs.size(0))
-            top5.update(prec5.item(), inputs.size(0))
+            topk.update(preck.item(), inputs.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
 
             # plot progress
-            bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} | ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | top5: {top5: .4f}'.format(
+            bar.suffix  = '({batch}/{size}) Data: {data:.3f}s | Batch: {bt:.3f}s | Total: {total:} \
+                            |ETA: {eta:} | Loss: {loss:.4f} | top1: {top1: .4f} | topk: {topk: .4f}'.format(
                         batch=batch_idx + 1,
                         size=len(valloader),
                         data=data_time.avg,
@@ -394,7 +396,7 @@ def validate(valloader, model, criterion, epoch, use_cuda, mode):
                         eta=bar.eta_td,
                         loss=losses.avg,
                         top1=top1.avg,
-                        top5=top5.avg,
+                        topk=topk.avg,
                         )
             bar.next()
         bar.finish()

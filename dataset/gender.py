@@ -2,9 +2,10 @@ import  os
 
 import numpy as np
 from PIL import Image
+import natsort
 
 import torch
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, ConcatDataset, random_split
 import torchvision
 from torchvision import datasets, models, transforms
 from utils.preprocess import transpose, normalize, TransformTwice
@@ -13,7 +14,61 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 INPUT_DIR_PATH = r"./data"
 DOMAIN = "domain_hawkice_damdev"
+DOMAIN_LIST = ["domain_hawkice_damdev", "domain_hawkice_longphong", "domain_inhouse_public"]
 
+
+def get_gender_data_from_all_domains(root, domain_list, n_labeled, n_class,
+                 transform_train=None, transform_val=None,
+                 download=True):
+    
+    # Train & Val
+    train_dataset_list = []
+    train_dataset = {}
+    for domain in domain_list:
+        # print(domain)
+        train_labeled_path = os.path.join(root, domain, 'train')
+        dataset_labeled_train = datasets.ImageFolder(train_labeled_path, transform=transform_train)
+        train_dataset[domain] = Data_labeled(dataset_labeled_train, 
+                                train=True, transform=transform_train)
+        train_dataset_list.append(train_dataset[domain])
+
+    train_dataset_all = ConcatDataset(train_dataset_list)
+    # train_labeled_idxs, val_idxs = train_val_split(dataset_labeled_train.targets, 
+    #                                                 n_labeled,
+    #                                                 n_class,
+    #                                                 val_split = 0.2)
+    # train_sampler = SubsetRandomSampler(train_labeled_idxs)
+    # valid_sampler = SubsetRandomSampler(val_idxs)
+
+    train_datasets  = dict()
+    train_datasets['train'], train_datasets['val'] = random_split(train_dataset_all, 
+                                                                  (round(0.8*len(train_dataset_all)), 
+                                                                   round(0.2*len(train_dataset_all)) )
+                                                                   )
+
+
+    # Test
+    test_dataset_list = []
+    test_dataset = {}
+    for domain in domain_list:
+        test_path = os.path.join(root, domain, 'test')
+        dataset_test = datasets.ImageFolder(test_path, transform=transform_val)
+        test_dataset[domain] = Data_labeled(dataset_test, train=False, 
+                                   transform=transform_val)
+        test_dataset_list.append(test_dataset[domain])
+    test_dataset_all = ConcatDataset(test_dataset_list)
+
+    # Unlabel
+    train_unlabeled_path = os.path.join(root, 'unlabeled')
+    train_unlabeled_dataset = Data_unlabeled(train_unlabeled_path,  
+                                                train=True, 
+                                                transform=TransformTwice(transform_train))
+
+    print (f"#Labeled: {len(train_datasets['train'])} \
+           #Unlabeled: {len(train_unlabeled_dataset)} \
+           #Val: {len(train_datasets['val'])}")
+    # return train_dataset_all, train_sampler, valid_sampler, train_unlabeled_dataset, test_dataset_all
+    return train_datasets, train_unlabeled_dataset, test_dataset
 
 def get_gender_data(root, domain, n_labeled, n_class,
                  transform_train=None, transform_val=None,
@@ -28,9 +83,9 @@ def get_gender_data(root, domain, n_labeled, n_class,
     # train_labeled_idxs, train_unlabeled_idxs, \
     #         val_idxs = train_val_split(dataset_labeled_train.targets, n_labeled, n_class)
     train_labeled_idxs, val_idxs = train_val_split(dataset_labeled_train.targets, 
-                                                   n_labeled, n_class,
-                                                   val_split = 0.2
-                                                   )
+                                                    n_labeled,
+                                                    n_class,
+                                                    val_split = 0.2)
     # train_labeled_dataset = Data_labeled(dataset_labeled_train, train_labeled_idxs, 
     #                                         train=True, transform=transform_train)
     # val_dataset = Data_labeled(dataset_labeled_train, val_idxs, train=True, 
@@ -125,6 +180,7 @@ class Data_unlabeled(Dataset):
         self.transform = transform
         self.all_imgs = os.listdir(root)
         self.total_imgs = len(self.all_imgs)
+        # self.total_imgs = natsort.natsorted(self.all_imgs)
         self.targets = np.array([-1 for _ in range(len(self.all_imgs))])
 
     def __len__(self):
