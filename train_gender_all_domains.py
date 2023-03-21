@@ -24,7 +24,7 @@ from tensorboardX import SummaryWriter
 
 parser = argparse.ArgumentParser(description='PyTorch MixMatch Training')
 # Optimization options
-parser.add_argument('--epochs', default=5, type=int, metavar='N',
+parser.add_argument('--epochs', default=10, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
@@ -47,7 +47,7 @@ parser.add_argument('--n-labeled', type=int, default=0,
                         help='Number of labeled data')
 parser.add_argument('--img_size', type=int, default=32,
                         help='Size of input image')
-parser.add_argument('--train-iteration', type=int, default=5,
+parser.add_argument('--train-iteration', type=int, default=25,
                         help='Number of iteration per epoch')
 parser.add_argument('--out', default='result',
                         help='Directory to output the result')
@@ -235,27 +235,26 @@ def train(labeled_trainloader, unlabeled_trainloader,
     end = time.time()
 
     if args.train_iteration == 0:
-        n_iteration = len(labeled_trainloader)
-    else:
-        n_iteration = args.train_iteration
-    bar = Bar('Training', max=n_iteration)
+        args.train_iteration = len(labeled_trainloader)
+
+    bar = Bar('Training', max=args.train_iteration)
 
     labeled_train_iter = iter(labeled_trainloader)
     unlabeled_train_iter = iter(unlabeled_trainloader)
 
     model.train()
-    for batch_idx in range(n_iteration):
+    for batch_idx in range(args.train_iteration):
         try:
-            inputs_x, targets_x = labeled_train_iter.next()
+            inputs_x, targets_x = next(labeled_train_iter)
         except:
             labeled_train_iter = iter(labeled_trainloader)
-            inputs_x, targets_x = labeled_train_iter.next()
+            inputs_x, targets_x = next(labeled_train_iter)
 
         try:
-            (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
+            (inputs_u, inputs_u2), _ = next(unlabeled_train_iter)
         except:
             unlabeled_train_iter = iter(unlabeled_trainloader)
-            (inputs_u, inputs_u2), _ = unlabeled_train_iter.next()
+            (inputs_u, inputs_u2), _ = next(unlabeled_train_iter)
 
         # measure data loading time
         data_time.update(time.time() - end)
